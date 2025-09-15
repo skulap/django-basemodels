@@ -1,0 +1,20 @@
+# IDE
+.idea
+
+# Python
+*.py[cod]
+*$py.class
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# celery
+celerybeat-schedule.*
+
+# Virtual env
+.venv
+venv
+
+# OLD FILES
+*.old

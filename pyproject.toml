@@ -1,0 +1,32 @@
+[project]
+name = "django-basemodels"
+version = "0.0.4"
+description = "Базовая Django-модель с поддержкой полиморфизма и soft-delete (django-polymorphic, django-safedelete), автоматическим управлением активности и интеграцией с Celery."
+authors = [
+    { name = "skulap", email = "skulap01@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "django-polymorphic (>=4.1.0,<5.0.0)",
+    "django-safedelete (>=1.4.1,<2.0.0)",
+    "celery-hchecker (>=0.0.3,<0.0.4)",
+]
+
+[tool.poetry]
+packages = [{include = "django_basemodels", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "django (>=5.2.6,<6.0.0)",
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-django (>=4.11.1,<5.0.0)",
+    "black (>=25.1.0,<26.0.0)",
+    "ruff (>=0.13.0,<0.14.0)",
+    "celery (>=5.5.3,<6.0.0)",
+    "django-celery-beat (>=2.8.1,<3.0.0)"
+]
