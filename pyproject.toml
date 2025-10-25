@@ -1,6 +1,6 @@
 [project]
 name = "django-basemodels"
-version = "0.0.5"
+version = "0.0.6"
 description = "Базовая Django-модель с поддержкой полиморфизма и soft-delete (django-polymorphic, django-safedelete), автоматическим управлением активности и интеграцией с Celery."
 authors = [
     { name = "skulap", email = "skulap01@gmail.com" }
