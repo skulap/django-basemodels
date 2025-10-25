@@ -7,11 +7,6 @@ from django.utils.translation import gettext_lazy as _lazy
 
 from . import CELERY_AVAILABLE
 
-if CELERY_AVAILABLE:
-    from celery import current_app as celery_app
-else:
-    celery_app = None
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,14 +29,11 @@ class DjangoBaseModelsAppConfig(AppConfig):
                 logger.debug("django_celery_beat not installed in INSTALLED_APPS")
                 return
 
-            # Регистрируем обработчик для сигнала on_after_configure
-            celery_app.on_after_configure.connect(self._create_periodic_task)
-            logger.debug("Registered Celery signal handler for periodic task creation")
-
+            self._create_periodic_task()
         except ImportError as e:
             logger.debug("Celery not available for signal registration: %s", e)
 
-    def _create_periodic_task(self, sender=None, **kwargs):
+    def _create_periodic_task(self):
         """
         Создаем периодическую задачу когда Celery сконфигурирован.
         Вызывается по сигналу on_after_configure.
@@ -50,22 +42,22 @@ class DjangoBaseModelsAppConfig(AppConfig):
             from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
             # Создаем или получаем интервал
-            schedule, created = IntervalSchedule.objects.get_or_create(
+            schedule, _created = IntervalSchedule.objects.get_or_create(
                 every=1,
                 period=IntervalSchedule.MINUTES,
             )
-            if created:
+            if _created:
                 logger.info("Created interval schedule for models activity update")
 
             # Создаем или получаем периодическую задачу
-            task, task_created = PeriodicTask.objects.get_or_create(
+            task, _task_created = PeriodicTask.objects.get_or_create(
                 interval=schedule,
                 name="Models activity update",
                 task="django_basemodels.update_activity_status",
                 defaults={"enabled": True},
             )
 
-            if task_created:
+            if _task_created:
                 logger.info("Created periodic task 'Models activity update'")
             else:
                 logger.debug("Periodic task 'Models activity update' already exists")
