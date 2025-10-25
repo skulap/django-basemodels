@@ -8,14 +8,13 @@ DEBUG = True
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
-
     # внешние зависимости, требуемые пакетом
     "polymorphic",
     "safedelete",
-
     # сам пакет и тестовое тест-приложение внутри него
     "django_basemodels",
     "django_basemodels.test_app",
+    "django_celery_beat",
 ]
 
 DATABASES = {

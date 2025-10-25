@@ -1,80 +1,83 @@
-import importlib
 import logging
 
 from django.apps import AppConfig, apps
 from django.conf import settings
 from django.core.checks import Error, register
-from django.db.models.signals import post_migrate
 from django.utils.translation import gettext_lazy as _lazy
+
+from . import CELERY_AVAILABLE
+
+if CELERY_AVAILABLE:
+    from celery import current_app as celery_app
+else:
+    celery_app = None
 
 logger = logging.getLogger(__name__)
 
 
 class DjangoBaseModelsAppConfig(AppConfig):
-    name = 'django_basemodels'
-    label = 'django_basemodels'
+    name = "django_basemodels"
+    label = "django_basemodels"
     verbose_name = _lazy("Базовые модели Django")
     default_auto_field = "django.db.models.AutoField"
 
     def ready(self):
-        self._register_signal_handlers()
+        self._register_celery_handlers()
 
-    def _register_signal_handlers(self):
-        self._setup_periodic_task()
-
-    def _setup_periodic_task(self):
-        if not apps.is_installed("django_celery_beat"):
-            logger.debug("django_celery_beat not installed in INSTALLED_APPS — skipping periodic task creation")
-            return
-
-        # Дополнительно проверяем, что пакет реально импортируется (установлен)
+    def _register_celery_handlers(self):
+        """Регистрируем обработчики для Celery только если он доступен"""
         try:
-            importlib.import_module("django_celery_beat")
-        except ImportError:
-            logger.debug("django_celery_beat package not importable — skipping periodic task creation")
-            return
+            if not CELERY_AVAILABLE:
+                return
 
-        post_migrate.connect(
-            self.create_models_activity_periodic_task,
-            dispatch_uid="django_basemodels_create_models_activity_periodic_task",
-        )
+            if not apps.is_installed("django_celery_beat"):
+                logger.debug("django_celery_beat not installed in INSTALLED_APPS")
+                return
 
-    @staticmethod
-    def create_models_activity_periodic_task(sender, **kwargs):
+            # Регистрируем обработчик для сигнала on_after_configure
+            celery_app.on_after_configure.connect(self._create_periodic_task)
+            logger.debug("Registered Celery signal handler for periodic task creation")
+
+        except ImportError as e:
+            logger.debug("Celery not available for signal registration: %s", e)
+
+    def _create_periodic_task(self, sender=None, **kwargs):
         """
-        Создаем расписание и периодическую задачу, если django_celery_beat доступен.
-        Этот обработчик вызывается после миграций (post_migrate) — значит таблицы должны существовать.
+        Создаем периодическую задачу когда Celery сконфигурирован.
+        Вызывается по сигналу on_after_configure.
         """
-        # локальный импорт моделей через apps.get_model чтобы избежать раннего импорта
         try:
-            IntervalSchedule = apps.get_model("django_celery_beat", "IntervalSchedule")
-            PeriodicTask = apps.get_model("django_celery_beat", "PeriodicTask")
-        except LookupError:
-            # Модели недоступны (возможно пакет не подключен) — ничего не делаем
-            logger.debug("django_celery_beat models not available — skipping creation")
-            return
+            from django_celery_beat.models import IntervalSchedule, PeriodicTask
 
-        try:
-            # Обернём DB-операции в try/except — на случай что БД недоступна в процессе 'makemigrations' и т.п.
-            schedule, _created = IntervalSchedule.objects.get_or_create(
+            # Создаем или получаем интервал
+            schedule, created = IntervalSchedule.objects.get_or_create(
                 every=1,
                 period=IntervalSchedule.MINUTES,
             )
-            PeriodicTask.objects.get_or_create(
+            if created:
+                logger.info("Created interval schedule for models activity update")
+
+            # Создаем или получаем периодическую задачу
+            task, task_created = PeriodicTask.objects.get_or_create(
                 interval=schedule,
                 name="Models activity update",
                 task="django_basemodels.update_activity_status",
+                defaults={"enabled": True},
             )
-            logger.info("Ensured periodic task 'Models activity update' exists (django_celery_beat)")
+
+            if task_created:
+                logger.info("Created periodic task 'Models activity update'")
+            else:
+                logger.debug("Periodic task 'Models activity update' already exists")
+
         except Exception as exc:
-            # Логируем, но не пробрасываем — чтобы не ломать команды manage.py
-            logger.exception("Failed to ensure periodic task for models activity: %s", exc)
+            logger.exception("Failed to create periodic task in Celery signal handler: %s", exc)
 
 
 @register
 def check_dependencies(app_configs, **kwargs):
     errors = []
-    required_apps = ['polymorphic', 'safedelete']
+    required_apps = ["polymorphic", "safedelete"]
 
     for app in required_apps:
         if app not in settings.INSTALLED_APPS:
@@ -82,7 +85,7 @@ def check_dependencies(app_configs, **kwargs):
                 Error(
                     f"{app} must be in INSTALLED_APPS.",
                     hint=f"Please, add '{app}' to INSTALLED_APPS",
-                    id='basemodels.E001',
+                    id="basemodels.E001",
                 )
             )
     return errors

@@ -26,14 +26,22 @@
 - (опционально) `celery_hchecker` — для проверки состояния Celery в рантайме (если используется)
 
 ## Установка
+### Базовая установка (без Celery)
 ```bash
 pip install django-basemodels
-
-# опционально для Celery-интеграции
-pip install celery django-celery-beat
 ```
 
-Добавьте в INSTALLED_APPS в settings.py:
+### С поддержкой Celery
+```bash
+pip install django-basemodels[celery]
+```
+
+### Функции, доступные только в Celery:
+- Автоматическое обновление статуса активности
+- Периодические задачи через django-celery-beat
+- Проверка здоровья celery
+
+### Добавьте в INSTALLED_APPS в settings.py:
 ```python
 INSTALLED_APPS = [
     # ...
@@ -43,6 +51,7 @@ INSTALLED_APPS = [
     # ...
 ]
 ```
+
 
 
 ## Быстрый старт
